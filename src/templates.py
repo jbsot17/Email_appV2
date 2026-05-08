@@ -153,9 +153,12 @@ def aplicar_variables(template: str, variables: Dict[str, str]) -> str:
     return resultado
 
 
-def obtener_subject_template(nombre: str, property_address: str = '') -> str:
+def obtener_subject_template(nombre: str, property_address: str = '', folio: str = '') -> str:
     todos = {**SUBJECTS_BUILTIN, ** _cargar_subjects()}
     subject = todos.get(nombre, 'Email from Engineering Services')
     if property_address:
         subject = subject.replace('{address}', property_address)
+        subject = subject.replace('{{Property Address}}', property_address)
+    if folio:
+        subject = subject.replace('{{Folio Number}}', folio)
     return subject

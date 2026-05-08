@@ -280,7 +280,7 @@ class ESIMOApp:
                 self.actualizar_resumen()
                 self.log(f"[ESIMO] Archivo: {self.stats['total']} registros")
                 if self.template_seleccionado:
-                    subject = obtener_subject_template(self.template_seleccionado, self.datos[0].get('address', ''))
+                    subject = obtener_subject_template(self.template_seleccionado, self.datos[0].get('address', ''), self.datos[0].get('folio', ''))
                     self.lbl_subject.configure(text=f"Asunto: {subject}", text_color=self.color_success)
             except Exception as e:
                 messagebox.showerror("Error", str(e))
@@ -290,7 +290,7 @@ class ESIMOApp:
         self.template_seleccionado = self.combo_template.get()
         if self.template_seleccionado:
             if self.datos:
-                subject = obtener_subject_template(self.template_seleccionado, self.datos[0].get('address', ''))
+                subject = obtener_subject_template(self.template_seleccionado, self.datos[0].get('address', ''), self.datos[0].get('folio', ''))
                 self.lbl_subject.configure(text=f"Asunto: {subject}", text_color=self.color_success)
             else:
                 self.lbl_subject.configure(text=f"Template: {self.template_seleccionado}", text_color=self.color_success)
@@ -429,7 +429,7 @@ class ESIMOApp:
             return
         try:
             template = obtener_template(self.template_seleccionado)
-            subject = obtener_subject_template(self.template_seleccionado, self.datos[0].get('address', ''))
+            subject = obtener_subject_template(self.template_seleccionado, self.datos[0].get('address', ''), self.datos[0].get('folio', ''))
             firma_html = obtener_firma(self.combo_firma.get())
             if firma_html:
                 template = inject_signature(template, firma_html)

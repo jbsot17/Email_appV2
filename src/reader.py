@@ -4,6 +4,25 @@ import pandas as pd
 from typing import List, Dict, Tuple
 import re
 
+COLUMN_MAP = {
+    'email': ['email', 'e-mail', 'mail', 'e_mail'],
+    'folio': ['folio', 'folio number', 'folio#', 'folio #', 'folio_num', 'folic number'],
+    'address': ['address', 'property address', 'site address', 'location', 'property_address']
+}
+
+
+def _normalizar_columnas(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df.columns = df.columns.str.strip().str.lower()
+    rename = {}
+    for col in df.columns:
+        for standard, aliases in COLUMN_MAP.items():
+            if col == standard or col in aliases:
+                rename[col] = standard
+                break
+    df.rename(columns=rename, inplace=True)
+    return df
+
 
 def leer_archivo_datos(ruta_archivo: str) -> Tuple[List[Dict], Dict]:
     """Lee un archivo CSV o XLSX y retorna los datos y estadísticas.
@@ -26,14 +45,14 @@ def leer_archivo_datos(ruta_archivo: str) -> Tuple[List[Dict], Dict]:
     else:
         raise ValueError(f"Formato no soportado: {ext}. Use CSV o XLSX")
     
-    df.columns = df.columns.str.strip().str.lower()
+    df = _normalizar_columnas(df)
     
     required_cols = ['email', 'folio', 'address']
     missing = [col for col in required_cols if col not in df.columns]
     
     if missing:
         raise ValueError(f"Columnas faltantes: {', '.join(missing)}. "
-                        f"Columnas encontradas: {', '.join(df.columns)}")
+                        f"Columnas encontradas: {', '.join(sorted(df.columns))}")
     
     df['email'] = df['email'].astype(str).str.strip()
     df['folio'] = df['folio'].astype(str).str.strip()
