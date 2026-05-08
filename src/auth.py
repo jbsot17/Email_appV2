@@ -127,7 +127,3 @@ def obtener_cuenta_por_nombre(nombre: str) -> Optional[Dict]:
     return None
 
 
-def esta_configurado() -> bool:
-    """Verifica si hay alguna cuenta configurada."""
-    config = obtener_config()
-    return len(config.get('credenciales', [])) > 0

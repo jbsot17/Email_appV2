@@ -70,22 +70,6 @@ def aplicar_variables(template: str, variables: Dict[str, str]) -> str:
     return resultado
 
 
-def obtener_info_template(nombre: str) -> Dict:
-    """Obtiene información de una plantilla.
-    
-    Args:
-        nombre: Nombre del archivo
-        
-    Returns:
-        Diccionario con información
-    """
-    return {
-        'nombre': nombre,
-        'ruta': str(obtener_ruta_templates() / nombre),
-        'disponible': True
-    }
-
-
 def obtener_subject_template(nombre: str, property_address: str = '') -> str:
     """Obtiene el subject para un template.
     

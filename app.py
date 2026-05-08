@@ -39,8 +39,6 @@ class ESIMOApp:
         self.stats = None
         self.template_seleccionado = None
         self.adjunto = None
-        self.log = lambda m: None
-        
         self.crear_interfaz()
 
     def crear_interfaz(self):

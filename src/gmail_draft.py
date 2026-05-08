@@ -10,6 +10,7 @@ from email.generator import Generator
 from io import BytesIO
 from typing import Dict, List, Optional, Callable
 from pathlib import Path
+from src.templates import aplicar_variables
 
 
 class GmailBorrador:
@@ -86,7 +87,7 @@ class GmailBorrador:
                 'Property Address': str(dato.get('address', ''))
             }
             
-            body = aplicar_variables_a_template(template, variables)
+            body = aplicar_variables(template, variables)
             destino = dato.get('email', '')
             
             resultado = self.crear_borrador(destino, subject, body, adjunto, sender_name)
@@ -107,9 +108,3 @@ class GmailBorrador:
         return stats
 
 
-def aplicar_variables_a_template(template: str, variables: Dict) -> str:
-    """Aplica variables al template."""
-    resultado = template
-    for clave, valor in variables.items():
-        resultado = resultado.replace('{{' + clave + '}}', str(valor))
-    return resultado

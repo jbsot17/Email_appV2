@@ -78,14 +78,3 @@ def validar_datos(datos: List[Dict]) -> Dict:
     return stats
 
 
-def obtener_vista_previa(datos: List[Dict], limit: int = 3) -> List[Dict]:
-    """Obtiene una vista previa de los primeros registros.
-    
-    Args:
-        datos: Lista de diccionarios
-        limit: Número de registros a mostrar
-        
-    Returns:
-        Lista con los primeros registros
-    """
-    return datos[:limit]
