@@ -18,8 +18,9 @@ from src.auth import (
     agregar_cuenta, lista_cuentas, seleccionar_cuenta,
     obtener_cuenta_activa, obtener_cuenta_por_nombre, eliminar_cuenta
 )
-from src.templates import listar_templates, obtener_template, obtener_subject_template
+from src.templates import listar_templates, obtener_template, obtener_subject_template, eliminar_template, listar_firmas, guardar_firma, obtener_firma, inject_signature
 from src.gmail_draft import GmailBorrador
+from src.template_import import importar_template
 
 
 class ESIMOApp:
@@ -39,6 +40,7 @@ class ESIMOApp:
         self.stats = None
         self.template_seleccionado = None
         self.adjunto = None
+        self.ruta_pdf_importar = None
         self.crear_interfaz()
 
     def crear_interfaz(self):
@@ -131,37 +133,60 @@ class ESIMOApp:
         btn_preview = ctk.CTkFrame(f3, fg_color="transparent")
         btn_preview.pack(anchor="w", padx=10, pady=(0, 2))
         ctk.CTkButton(btn_preview, text="Ver Preview", command=self.ver_preview, width=80).pack(side="left", padx=(0, 5))
+        ctk.CTkButton(btn_preview, text="Eliminar", command=self.eliminar_template, fg_color=self.color_danger, width=70).pack(side="left", padx=2)
         
         self.lbl_subject = ctk.CTkLabel(f3, text="", text_color="gray", font=("Roboto", 9))
-        self.lbl_subject.pack(anchor="w", padx=10, pady=(0, 6))
+        self.lbl_subject.pack(anchor="w", padx=10, pady=(0, 2))
+
+        firma_row = ctk.CTkFrame(f3, fg_color="transparent")
+        firma_row.pack(anchor="w", padx=10, pady=(0, 6))
+        ctk.CTkLabel(firma_row, text="Firma:", font=("Roboto", 11)).pack(side="left")
+        self.combo_firma = ctk.CTkComboBox(firma_row, values=listar_firmas(), width=130)
+        self.combo_firma.pack(side="left", padx=5)
+        ctk.CTkButton(firma_row, text="Firmas", command=self.abrir_gestor_firmas, width=60).pack(side="left")
         
-        # === ROW 3: 4. Adjunto | ENVIAR FIJO ===
+        # === ROW 3: 4. Adjunto | 5. Importar Template | ENVIAR ===
         row3 = ctk.CTkFrame(self.root)
         row3.grid(row=3, column=0, sticky="ew", padx=15, pady=4)
         row3.grid_columnconfigure(0, weight=1)
-        row3.grid_columnconfigure(1, weight=0)
+        row3.grid_columnconfigure(1, weight=1)
+        row3.grid_columnconfigure(2, weight=0)
         
-        # 4. Adjunto (izquierda)
+        # 4. Adjunto (col 0)
         f4 = ctk.CTkFrame(row3)
-        f4.grid(row=0, column=0, sticky="w", padx=(0, 10))
+        f4.grid(row=0, column=0, sticky="w", padx=(0, 5))
         ctk.CTkLabel(f4, text="4. Adjunto", font=("Roboto", 13, "bold")).pack(anchor="w", padx=10, pady=(5, 2))
         ctk.CTkButton(f4, text="Seleccionar PDF", command=self.seleccionar_adjunto, width=150).pack(anchor="w", padx=10, pady=(0, 3))
         self.lbl_adj = ctk.CTkLabel(f4, text="Ninguno", text_color="gray", font=("Roboto", 10))
         self.lbl_adj.pack(anchor="w", padx=10, pady=(0, 6))
         
-        # Boton ENVIAR (derecha, fijo)
+        # 5. Importar Template (col 1)
+        f_import = ctk.CTkFrame(row3)
+        f_import.grid(row=0, column=1, sticky="ew", padx=(5, 5))
+        ctk.CTkLabel(f_import, text="5. Importar Template", font=("Roboto", 13, "bold")).pack(anchor="w", padx=10, pady=(5, 2))
+        import_row = ctk.CTkFrame(f_import, fg_color="transparent")
+        import_row.pack(fill="x", padx=10, pady=(0, 5))
+        ctk.CTkButton(import_row, text="Cargar PDF", command=self.seleccionar_archivo_template, width=90).pack(side="left", padx=(0, 5))
+        ctk.CTkLabel(import_row, text="Nombre:", font=("Roboto", 11)).pack(side="left")
+        self.entry_template_nombre = ctk.CTkEntry(import_row, width=100, font=("Roboto", 11))
+        self.entry_template_nombre.pack(side="left", padx=3)
+        ctk.CTkButton(import_row, text="+ Agregar", command=self.agregar_template, fg_color=self.color_success, width=75).pack(side="left")
+        self.lbl_import_status = ctk.CTkLabel(f_import, text="", text_color="gray", font=("Roboto", 10))
+        self.lbl_import_status.pack(anchor="w", padx=10, pady=(0, 5))
+        
+        # Boton ENVIAR (col 2)
         self.btn_enviar = ctk.CTkButton(
             row3, 
             text="ENVIAR EMAILS", 
             command=self.enviar_emails, 
             fg_color=self.color_company,
             hover_color="#A0000B",
-            font=("Roboto", 16, "bold"),
-            height=55,
-            width=180
+            font=("Roboto", 14, "bold"),
+            height=45,
+            width=150
         )
-        self.btn_enviar.grid(row=0, column=1, sticky="e", padx=(0, 0), ipady=5)
-        
+        self.btn_enviar.grid(row=0, column=2, sticky="e", padx=(5, 0))
+
         # === ROW 4: Resumen ===
         f_resumen = ctk.CTkFrame(self.root, fg_color="#f0f0f0")
         f_resumen.grid(row=4, column=0, sticky="ew", padx=15, pady=4)
@@ -186,7 +211,11 @@ class ESIMOApp:
     def actualizar_resumen(self):
         if self.datos and self.template_seleccionado and self.stats:
             adj_text = f" | {os.path.basename(self.adjunto)}" if self.adjunto else ""
-            self.lbl_resumen.configure(text=f"Resumen: {self.stats['total']} | {self.template_seleccionado}{adj_text}", text_color=self.color_success)
+            addr = self.datos[0].get('address', '') if self.datos else ''
+            folio = self.datos[0].get('folio', '') if self.datos else ''
+            data_text = f" | {addr}" if addr else ""
+            data_text += f" (Folio {folio})" if folio else ""
+            self.lbl_resumen.configure(text=f"Resumen: {self.stats['total']} | {self.template_seleccionado}{data_text}{adj_text}", text_color=self.color_success)
         elif self.datos and self.stats:
             self.lbl_resumen.configure(text=f"Resumen: {self.stats['total']} | Sin template", text_color=self.color_warning)
         else:
@@ -275,6 +304,10 @@ class ESIMOApp:
         try:
             from src.templates import aplicar_variables
             html = aplicar_variables(obtener_template(self.template_seleccionado), {'Folio Number': 'EXAMPLE-001', 'Property Address': '123 Main Street'})
+            firma = self.combo_firma.get()
+            if firma:
+                firma_html = obtener_firma(firma)
+                html = inject_signature(html, firma_html)
             import tempfile, webbrowser
             with tempfile.NamedTemporaryFile(suffix='.html', delete=False, mode='w', encoding='utf-8') as f:
                 f.write(html)
@@ -282,6 +315,96 @@ class ESIMOApp:
             self.log(f"[ESIMO] Preview abierta")
         except Exception as e:
             messagebox.showerror("Error", str(e))
+
+    def abrir_gestor_firmas(self):
+        win = ctk.CTkToplevel(self.root)
+        win.title("Administrar Firmas")
+        win.geometry("450x380")
+        win.resizable(False, False)
+        win.grab_set()
+
+        ctk.CTkLabel(win, text="Firmas Existentes", font=("Roboto", 13, "bold")).pack(anchor="w", padx=15, pady=(12, 2))
+        firmas = listar_firmas()
+        lbl_firmas = ctk.CTkLabel(win, text="\n".join(firmas) if firmas else "(ninguna)", font=("Roboto", 11), text_color="gray", justify="left")
+        lbl_firmas.pack(anchor="w", padx=15, pady=(0, 8))
+
+        ctk.CTkLabel(win, text="Crear Nueva Firma", font=("Roboto", 13, "bold")).pack(anchor="w", padx=15, pady=(4, 4))
+
+        frame = ctk.CTkFrame(win, fg_color="transparent")
+        frame.pack(fill="x", padx=15, pady=(0, 8))
+
+        fields = [
+            ("Nombre:", "person_name"),
+            ("Cargo:", "title"),
+            ("Email:", "email"),
+            ("Tel. Directo:", "direct_phone"),
+            ("Tel. Oficina:", "office_phone"),
+        ]
+        entries = {}
+        for i, (label, key) in enumerate(fields):
+            ctk.CTkLabel(frame, text=label, font=("Roboto", 11)).grid(row=i, column=0, sticky="w", pady=2)
+            entry = ctk.CTkEntry(frame, width=280, font=("Roboto", 11))
+            entry.grid(row=i, column=1, sticky="w", padx=(8, 0), pady=2)
+            entries[key] = entry
+
+        def guardar():
+            data = {}
+            for key, entry in entries.items():
+                val = entry.get().strip()
+                if not val:
+                    messagebox.showwarning("Falta", f"Complete el campo: {key}")
+                    return
+                data[key] = val
+            nombre_archivo = data["person_name"].lower().replace(" ", "_") + ".json"
+            ruta = guardar_firma(nombre_archivo, data)
+            self.combo_firma.configure(values=listar_firmas())
+            win.destroy()
+            self.log(f"[ESIMO] Firma creada: {nombre_archivo}")
+
+        ctk.CTkButton(win, text="Guardar Firma", command=guardar, fg_color=self.color_success, width=120).pack(pady=(4, 12))
+
+    def seleccionar_archivo_template(self):
+        archivo = filedialog.askopenfilename(title="Seleccionar PDF", filetypes=[("PDF", "*.pdf")])
+        if archivo:
+            self.ruta_pdf_importar = archivo
+            self.lbl_import_status.configure(text=os.path.basename(archivo), text_color=self.color_success)
+            self.log(f"[ESIMO] PDF seleccionado: {os.path.basename(archivo)}")
+
+    def agregar_template(self):
+        if not self.ruta_pdf_importar:
+            messagebox.showwarning("!", "Seleccione un archivo PDF primero")
+            return
+        nombre = self.entry_template_nombre.get().strip()
+        if not nombre:
+            messagebox.showwarning("!", "Ingrese un nombre para el template")
+            return
+        try:
+            importar_template(self.ruta_pdf_importar, nombre)
+            self.ruta_pdf_importar = None
+            self.entry_template_nombre.delete(0, tk.END)
+            self.lbl_import_status.configure(text="")
+            self.combo_template.configure(values=listar_templates())
+            self.log(f"[ESIMO] Template '{nombre}' importado")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            self.log(f"[ERROR] {str(e)}")
+
+    def eliminar_template(self):
+        if not self.template_seleccionado:
+            messagebox.showwarning("!", "Seleccione un template")
+            return
+        if not messagebox.askyesno("Eliminar", f"¿Eliminar '{self.template_seleccionado}'?"):
+            return
+        try:
+            eliminar_template(self.template_seleccionado)
+            self.template_seleccionado = None
+            self.lbl_subject.configure(text="")
+            self.combo_template.configure(values=listar_templates())
+            self.actualizar_resumen()
+            self.log(f"[ESIMO] Template eliminado")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            self.log(f"[ERROR] {str(e)}")
 
     def seleccionar_adjunto(self):
         archivo = filedialog.askopenfilename(title="Seleccionar adjunto", filetypes=[("PDF", "*.pdf"), ("Todos", "*.*")])
@@ -307,6 +430,9 @@ class ESIMOApp:
         try:
             template = obtener_template(self.template_seleccionado)
             subject = obtener_subject_template(self.template_seleccionado, self.datos[0].get('address', ''))
+            firma_html = obtener_firma(self.combo_firma.get())
+            if firma_html:
+                template = inject_signature(template, firma_html)
             Gmail = GmailBorrador(cuenta['email'], cuenta['app_password'])
             self.btn_enviar.configure(state="disabled", text="ENVIANDO...")
             self.log(f"[ESIMO] Enviando {len(self.datos)}...")
